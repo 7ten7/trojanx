@@ -3,8 +3,9 @@ package trojanx
 import (
 	"context"
 	"crypto/tls"
-	"errors"
+	"github.com/kallydev/trojanx/internal/common"
 	"github.com/kallydev/trojanx/internal/pipe"
+	"github.com/kallydev/trojanx/internal/tunnel"
 	"github.com/kallydev/trojanx/metadata"
 	"github.com/kallydev/trojanx/protocol"
 	"github.com/sirupsen/logrus"
@@ -34,13 +35,7 @@ func (s *Server) run() error {
 	}
 	var tlsCertificates []tls.Certificate
 	if s.config.TLSConfig != nil {
-		for _, certificateFile := range s.config.TLSConfig.CertificateFiles {
-			certificate, err := tls.LoadX509KeyPair(certificateFile.PublicKeyFile, certificateFile.PrivateKeyFile)
-			if err != nil {
-				return err
-			}
-			tlsCertificates = append(tlsCertificates, certificate)
-		}
+		tlsCertificates = append(tlsCertificates, s.config.TLSConfig.Certificate)
 		s.tlsListener = tls.NewListener(s.tcpListener, &tls.Config{
 			Certificates: tlsCertificates,
 		})
@@ -56,11 +51,11 @@ func (s *Server) run() error {
 			s.ErrorHandler(s.ctx, err)
 			continue
 		}
-		go s.handle(conn)
+		go s.Handle(conn)
 	}
 }
 
-func (s *Server) handle(conn net.Conn) {
+func (s *Server) Handle(conn net.Conn) {
 	defer conn.Close()
 	// TODO Not used for now
 	ctx := metadata.NewContext(context.Background(), metadata.Metadata{
@@ -75,7 +70,7 @@ func (s *Server) handle(conn net.Conn) {
 		s.ErrorHandler(ctx, err)
 		return
 	}
-	if !s.AuthenticationHandler(ctx, token) {
+	if !s.AuthenticationHandler(ctx, token, s.config.Password) {
 		logrus.Debugln("authentication not passed", conn.RemoteAddr())
 		if s.config.ReverseProxyConfig == nil {
 			return
@@ -102,9 +97,13 @@ func (s *Server) handle(conn net.Conn) {
 		return
 	}
 	if req.Command == protocol.CommandUDP {
-		s.ErrorHandler(ctx, errors.New("unsupported udp protocol"))
-		return
+		s.relayPacketLoop(conn)
+	} else if req.Command == protocol.CommandConnect {
+		s.relayConnLoop(ctx, conn, req)
 	}
+}
+
+func (s *Server) relayConnLoop(ctx context.Context, conn net.Conn, req *protocol.Request) {
 	dst, err := net.Dial("tcp", net.JoinHostPort(req.DescriptionAddress, strconv.Itoa(req.DescriptionPort)))
 	if err != nil {
 		s.ErrorHandler(ctx, err)
@@ -113,6 +112,42 @@ func (s *Server) handle(conn net.Conn) {
 	defer dst.Close()
 	go pipe.Copy(dst, conn)
 	pipe.Copy(conn, dst)
+}
+
+func (s *Server) relayPacketLoop(conn net.Conn) {
+	udpConn, _ := net.ListenPacket("udp4", "")
+	defer udpConn.Close()
+	defer conn.Close()
+	outbound := tunnel.UDPConn{udpConn.(*net.UDPConn)}
+	inbound := tunnel.TrojanConn{conn}
+	errChan := make(chan error, 2)
+	copyPacket := func(a, b common.PacketConn) {
+		for {
+			buf := make([]byte, common.MaxPacketSize)
+			n, metadata, err := a.ReadWithMetadata(buf)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			if n == 0 {
+				errChan <- nil
+				return
+			}
+			_, err = b.WriteWithMetadata(buf[:n], metadata)
+			if err != nil {
+				errChan <- err
+				return
+			}
+		}
+	}
+	go copyPacket(&inbound, &outbound)
+	go copyPacket(&outbound, &inbound)
+	select {
+	case err := <-errChan:
+		if err != nil {
+			logrus.Error(err)
+		}
+	}
 }
 
 func (s *Server) Run() error {
@@ -128,7 +163,7 @@ func (s *Server) Run() error {
 	}
 }
 
-func New(ctx context.Context, config *Config) *Server {
+func NewServer(ctx context.Context, config *Config) *Server {
 	return &Server{
 		ctx:                   ctx,
 		config:                config,

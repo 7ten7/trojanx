@@ -1,16 +1,19 @@
 package trojanx
 
+import "crypto/tls"
+
 type Config struct {
 	Host               string              `json:"host"`
+	Password           string              `json:"password"`
 	Port               int                 `json:"port"`
 	TLSConfig          *TLSConfig          `json:"tls_config"`
 	ReverseProxyConfig *ReverseProxyConfig `json:"reverse_proxy"`
 }
 
 type TLSConfig struct {
-	MinVersion       uint16 `json:"min_version"`
-	MaxVersion       uint16 `json:"max_version"`
-	CertificateFiles []CertificateFileConfig
+	MinVersion  uint16 `json:"min_version"`
+	MaxVersion  uint16 `json:"max_version"`
+	Certificate tls.Certificate
 }
 
 type CertificateFileConfig struct {

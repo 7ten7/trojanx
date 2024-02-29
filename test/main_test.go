@@ -1,4 +1,4 @@
-package main
+package test
 
 import (
 	"context"
@@ -8,19 +8,11 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"testing"
 	"time"
 )
 
-func init() {
-	logrus.SetLevel(logrus.DebugLevel)
-	logrus.SetFormatter(&logrus.TextFormatter{
-		ForceColors:     true,
-		FullTimestamp:   true,
-		TimestampFormat: time.RFC3339,
-	})
-}
-
-func main() {
+func Test_Main(t *testing.T) {
 	go func() {
 		server := &http.Server{
 			Addr:         "127.0.0.1:80",
@@ -36,25 +28,22 @@ func main() {
 			default:
 				writer.Header().Set("Connection", "close")
 				writer.Header().Set("Referrer-Policy", "no-referrer")
-				http.Redirect(writer, request, "https://example.com/", http.StatusFound)
+				http.Redirect(writer, request, "https://www.baidu.com/", http.StatusFound)
 			}
 		})
 		if err := server.ListenAndServe(); err != nil {
 			log.Fatalln(err)
 		}
 	}()
-	srv := trojanx.New(context.Background(), &trojanx.Config{
-		Host: net.IPv4zero.String(),
-		Port: 443,
+	signed, _ := generateSelfSigned()
+	srv := trojanx.NewServer(context.Background(), &trojanx.Config{
+		Host:     net.IPv4zero.String(),
+		Password: "password",
+		Port:     443,
 		TLSConfig: &trojanx.TLSConfig{
-			MinVersion: tls.VersionTLS13,
-			MaxVersion: tls.VersionTLS13,
-			CertificateFiles: []trojanx.CertificateFileConfig{
-				{
-					PublicKeyFile:  "/etc/letsencrypt/live/example.com/fullchain.pem",
-					PrivateKeyFile: "/etc/letsencrypt/live/example.com/privkey.pem",
-				},
-			},
+			MinVersion:  tls.VersionTLS13,
+			MaxVersion:  tls.VersionTLS13,
+			Certificate: signed,
 		},
 		ReverseProxyConfig: &trojanx.ReverseProxyConfig{
 			Scheme: "http",
@@ -64,13 +53,6 @@ func main() {
 	})
 	srv.ConnectHandler = func(ctx context.Context) bool {
 		return true
-	}
-	srv.AuthenticationHandler = func(ctx context.Context, hash string) bool {
-		switch hash {
-		// TODO verify password
-		default:
-			return false
-		}
 	}
 	srv.ErrorHandler = func(ctx context.Context, err error) {
 		logrus.Errorln(err)
