@@ -58,7 +58,7 @@ func (s *Server) ServeConn(conn net.Conn) {
 		return
 	}
 	token, err := protocol.GetToken(conn)
-	if err != nil && token == "" {
+	if err != nil {
 		s.errorHandler(ctx, err)
 		return
 	}
