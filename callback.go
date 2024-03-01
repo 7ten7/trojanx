@@ -5,23 +5,21 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"github.com/kallydev/trojanx/protocol"
-	"github.com/sirupsen/logrus"
 	"net"
 )
 
 type (
-	ConnectHandler        = func(ctx context.Context) bool
-	AuthenticationHandler = func(ctx context.Context, reqHash string, serverHash string) bool
-	RequestHandler        = func(ctx context.Context, request protocol.Request) bool
-	ForwardHandler        = func(ctx context.Context, upload, download int64) bool
-	ErrorHandler          = func(ctx context.Context, err error)
+	connectHandler        = func(ctx context.Context) bool
+	authenticationHandler = func(ctx context.Context, reqHash string, serverHash string) bool
+	requestHandler        = func(ctx context.Context, request protocol.Request) bool
+	errorHandler          = func(ctx context.Context, err error)
 )
 
-func DefaultConnectHandler(ctx context.Context) bool {
+func (s *Server) defaultConnectHandler(ctx context.Context) bool {
 	return true
 }
 
-func DefaultAuthenticationHandler(ctx context.Context, reqHash string, serverHash string) bool {
+func (s *Server) defaultAuthenticationHandler(ctx context.Context, reqHash string, serverHash string) bool {
 	switch reqHash {
 	case sha224(serverHash):
 		return true
@@ -37,12 +35,12 @@ func sha224(password string) string {
 	return hex.EncodeToString(sha224Hash)
 }
 
-func DefaultRequestHandler(ctx context.Context, request protocol.Request) bool {
+func (s *Server) defaultRequestHandler(ctx context.Context, request protocol.Request) bool {
 	var remoteIP net.IP
 	if request.AddressType == protocol.AddressTypeDomain {
 		tcpAddr, err := net.ResolveTCPAddr("tcp", request.DescriptionAddress)
 		if err != nil {
-			logrus.Errorln(err)
+			s.logger.Errorln(err)
 			return false
 		}
 		remoteIP = tcpAddr.IP
@@ -55,6 +53,6 @@ func DefaultRequestHandler(ctx context.Context, request protocol.Request) bool {
 	return true
 }
 
-func DefaultErrorHandler(ctx context.Context, err error) {
-	logrus.Errorln(err)
+func (s *Server) defaultErrorHandler(ctx context.Context, err error) {
+	s.logger.Errorln(err)
 }

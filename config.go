@@ -1,11 +1,11 @@
 package trojanx
 
-import "crypto/tls"
+import (
+	"crypto/tls"
+)
 
-type Config struct {
-	Host               string              `json:"host"`
+type TrojanConfig struct {
 	Password           string              `json:"password"`
-	Port               int                 `json:"port"`
 	TLSConfig          *TLSConfig          `json:"tls_config"`
 	ReverseProxyConfig *ReverseProxyConfig `json:"reverse_proxy"`
 }

@@ -1,18 +1,16 @@
-package test
+package main
 
 import (
-	"context"
 	"crypto/tls"
 	"github.com/kallydev/trojanx"
 	"github.com/sirupsen/logrus"
 	"log"
 	"net"
 	"net/http"
-	"testing"
 	"time"
 )
 
-func Test_Main(t *testing.T) {
+func main() {
 	go func() {
 		server := &http.Server{
 			Addr:         "127.0.0.1:80",
@@ -35,11 +33,10 @@ func Test_Main(t *testing.T) {
 			log.Fatalln(err)
 		}
 	}()
+
 	signed, _ := generateSelfSigned()
-	srv := trojanx.NewServer(context.Background(), &trojanx.Config{
-		Host:     net.IPv4zero.String(),
+	config := &trojanx.TrojanConfig{
 		Password: "password",
-		Port:     443,
 		TLSConfig: &trojanx.TLSConfig{
 			MinVersion:  tls.VersionTLS13,
 			MaxVersion:  tls.VersionTLS13,
@@ -50,14 +47,13 @@ func Test_Main(t *testing.T) {
 			Host:   "127.0.0.1",
 			Port:   80,
 		},
-	})
-	srv.ConnectHandler = func(ctx context.Context) bool {
-		return true
 	}
-	srv.ErrorHandler = func(ctx context.Context, err error) {
-		logrus.Errorln(err)
-	}
-	if err := srv.Run(); err != nil {
+
+	srv := trojanx.NewServer(
+		trojanx.WithConfig(config),
+		trojanx.WithLogger(&logrus.Logger{}),
+	)
+	if err := srv.ListenAndServe("tcp", ":443"); err != nil {
 		logrus.Fatalln(err)
 	}
 }

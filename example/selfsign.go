@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // Package selfsign is a test helper that generates self signed certificate.
-package test
+package main
 
 import (
 	"crypto"
