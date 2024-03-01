@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/kallydev/trojanx/internal/common"
+	"github.com/7ten7/trojanx/internal/common"
 	"io"
 	"io/ioutil"
 	"net"

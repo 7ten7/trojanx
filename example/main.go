@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/tls"
-	"github.com/kallydev/trojanx"
+	"github.com/7ten7/trojanx"
 	"github.com/sirupsen/logrus"
 	"log"
 	"net"

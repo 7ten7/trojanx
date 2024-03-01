@@ -8,48 +8,59 @@ Trojan server **framework**.
 package main
 
 import (
-	"context"
 	"crypto/tls"
-	"github.com/kallydev/trojanx"
+	"github.com/7ten7/trojanx"
 	"github.com/sirupsen/logrus"
+	"log"
 	"net"
+	"net/http"
+	"time"
 )
 
 func main() {
-	srv := trojanx.New(context.Background(), &trojanx.Config{
-		Host: net.IPv4zero.String(),
-		Port: 443,
+	go func() {
+		server := &http.Server{
+			Addr:         "127.0.0.1:80",
+			ReadTimeout:  3 * time.Second,
+			WriteTimeout: 3 * time.Second,
+		}
+		server.SetKeepAlivesEnabled(false)
+		http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+			defer request.Body.Close()
+			logrus.Debugln(request.RemoteAddr, request.RequestURI)
+			host, _, _ := net.SplitHostPort(request.Host)
+			switch host {
+			default:
+				writer.Header().Set("Connection", "close")
+				writer.Header().Set("Referrer-Policy", "no-referrer")
+				http.Redirect(writer, request, "https://www.baidu.com/", http.StatusFound)
+			}
+		})
+		if err := server.ListenAndServe(); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+	signed, _ := generateSelfSigned()
+	config := &trojanx.TrojanConfig{
+		Password: "password",
 		TLSConfig: &trojanx.TLSConfig{
-			MinVersion: tls.VersionTLS13,
-			MaxVersion: tls.VersionTLS13,
-			CertificateFiles: []trojanx.CertificateFileConfig{
-				{
-					PublicKeyFile:  "/etc/letsencrypt/live/example.com/fullchain.pem",
-					PrivateKeyFile: "/etc/letsencrypt/live/example.com/privkey.pem",
-				},
-			},
+			MinVersion:  tls.VersionTLS13,
+			MaxVersion:  tls.VersionTLS13,
+			Certificate: signed,
 		},
 		ReverseProxyConfig: &trojanx.ReverseProxyConfig{
 			Scheme: "http",
 			Host:   "127.0.0.1",
 			Port:   80,
 		},
-	})
-	srv.ConnectHandler = func(ctx context.Context) bool {
-		// TODO Allow or deny connection requests
-		return true
 	}
-	srv.AuthenticationHandler = func(ctx context.Context, hash string) bool {
-		switch hash {
-		// TODO Verify password
-		default:
-			return false
-		}
-	}
-	srv.ErrorHandler = func(ctx context.Context, err error) {
-		logrus.Errorln(err)
-	}
-	if err := srv.Run(); err != nil {
+
+	srv := trojanx.NewServer(
+		trojanx.WithConfig(config),
+		trojanx.WithLogger(&logrus.Logger{}),
+	)
+	if err := srv.ListenAndServe("tcp", ":443"); err != nil {
 		logrus.Fatalln(err)
 	}
 }

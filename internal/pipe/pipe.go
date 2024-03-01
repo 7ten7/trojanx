@@ -2,7 +2,7 @@ package pipe
 
 import (
 	"errors"
-	"github.com/kallydev/trojanx/internal/pool"
+	"github.com/7ten7/trojanx/internal/pool"
 	"io"
 	"net"
 )

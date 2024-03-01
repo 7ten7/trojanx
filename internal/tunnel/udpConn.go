@@ -1,7 +1,7 @@
 package tunnel
 
 import (
-	"github.com/kallydev/trojanx/internal/common"
+	"github.com/7ten7/trojanx/internal/common"
 	"net"
 )
 

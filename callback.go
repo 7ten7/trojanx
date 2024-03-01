@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"github.com/kallydev/trojanx/protocol"
+	"github.com/7ten7/trojanx/protocol"
 	"net"
 )
 
