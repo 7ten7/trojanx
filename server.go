@@ -14,11 +14,11 @@ import (
 )
 
 type Server struct {
-	ctx         context.Context
-	config      *TrojanConfig
-	tlsListener net.Listener
-	logger      *logrus.Logger
-
+	ctx                   context.Context
+	config                *TrojanConfig
+	tlsListener           net.Listener
+	logger                *logrus.Logger
+	dial                  func(ctx context.Context, network, addr string) (net.Conn, error)
 	connectHandler        connectHandler
 	authenticationHandler authenticationHandler
 	requestHandler        requestHandler
@@ -96,7 +96,13 @@ func (s *Server) ServeConn(conn net.Conn) {
 }
 
 func (s *Server) relayConnLoop(ctx context.Context, conn net.Conn, req *protocol.Request) {
-	dst, err := net.Dial("tcp", net.JoinHostPort(req.DescriptionAddress, strconv.Itoa(req.DescriptionPort)))
+	dial := s.dial
+	if dial == nil {
+		dial = func(ctx context.Context, net_, addr string) (net.Conn, error) {
+			return net.Dial(net_, addr)
+		}
+	}
+	dst, err := dial(ctx, "tcp", net.JoinHostPort(req.DescriptionAddress, strconv.Itoa(req.DescriptionPort)))
 	if err != nil {
 		s.errorHandler(ctx, err)
 		return

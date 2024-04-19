@@ -1,6 +1,10 @@
 package trojanx
 
-import "github.com/sirupsen/logrus"
+import (
+	"context"
+	"github.com/sirupsen/logrus"
+	"net"
+)
 
 type Option func(s *Server)
 
@@ -13,6 +17,12 @@ func WithLogger(l *logrus.Logger) Option {
 func WithConfig(config *TrojanConfig) Option {
 	return func(s *Server) {
 		s.config = config
+	}
+}
+
+func WithDial(dial func(ctx context.Context, network, addr string) (net.Conn, error)) Option {
+	return func(s *Server) {
+		s.dial = dial
 	}
 }
 
